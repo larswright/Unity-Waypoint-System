@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdd550c08ae9a2048aa6d21920568814, type: 3}
+  m_Name: WaypointSettings2D
+  m_EditorClassIdentifier: 
+  UpdateFrequency: 0.01
+  GameMode: 1
+  MarkerPrefab: {fileID: 6229256527508535590, guid: 22f58613e70b4f944b9447892f34b727, type: 3}
+  MaxVisibleDistance: 1000
+  IgnoreZAxisForDistance2D: 1
+  UseOffScreenIndicators: 1
+  ScreenEdgeMargin: 40.2
+  FlipOffScreenMarkerY: 1
