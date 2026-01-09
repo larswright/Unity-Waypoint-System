@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Pool; // Required for efficient object pooling
 using System.Collections.Generic;
+using System;
 
 namespace WrightAngle.Waypoint
 {
@@ -29,7 +30,14 @@ namespace WrightAngle.Waypoint
         // Collections to manage active targets and their corresponding markers.
         private List<WaypointTarget> activeTargetList = new List<WaypointTarget>(); // Used for efficient iteration.
         private HashSet<WaypointTarget> activeTargetSet = new HashSet<WaypointTarget>(); // Used for fast checking of target existence.
+        private HashSet<WaypointTarget> pausedTargets = new HashSet<WaypointTarget>(); // Targets temporarily hidden via SetTargetActive(false).
         private Dictionary<WaypointTarget, WaypointMarkerUI> activeMarkers = new Dictionary<WaypointTarget, WaypointMarkerUI>(); // Maps a target to its active UI marker.
+
+        // --- Public Events ---
+        /// <summary> Fired when a marker is retrieved from the pool and assigned to a target. </summary>
+        public event Action<WaypointTarget, WaypointMarkerUI> OnMarkerCreated;
+        /// <summary> Fired when a marker is released back to the pool. </summary>
+        public event Action<WaypointTarget, WaypointMarkerUI> OnMarkerReleased;
 
         private Camera _cachedWaypointCamera; // Cached camera reference for performance.
         private Camera _cachedUICamera;        // Cached UI camera for RectTransformUtility conversions (null for Screen Space - Overlay).
@@ -64,8 +72,12 @@ namespace WrightAngle.Waypoint
             InitializePool();
 
             // Subscribe to events from WaypointTarget components for dynamic registration/unregistration.
+            // NOTE: These are marked obsolete for external consumers, but the manager still uses them
+            // internally for backwards compatibility with existing WaypointTarget components.
+#pragma warning disable CS0618 // Obsolete warning suppressed for internal usage
             WaypointTarget.OnTargetEnabled += HandleTargetEnabled;
             WaypointTarget.OnTargetDisabled += HandleTargetDisabled;
+#pragma warning restore CS0618
 
             isInitialized = true; // Mark initialization successful.
             Debug.Log($"<b>[{gameObject.name}] WaypointUIManager:</b> Initialized.", this);
@@ -83,8 +95,10 @@ namespace WrightAngle.Waypoint
         {
             // --- Cleanup ---
             // Unsubscribe from events to prevent memory leaks when the manager is destroyed.
+#pragma warning disable CS0618 // Obsolete warning suppressed for internal usage
             WaypointTarget.OnTargetEnabled -= HandleTargetEnabled;
             WaypointTarget.OnTargetDisabled -= HandleTargetDisabled;
+#pragma warning restore CS0618
 
             // Ensure tracked targets don't keep stale "registered" state when the manager is gone.
             foreach (WaypointTarget target in activeTargetSet)
@@ -97,6 +111,7 @@ namespace WrightAngle.Waypoint
             markerPool?.Dispose();
             activeTargetList.Clear();
             activeTargetSet.Clear();
+            pausedTargets.Clear();
             activeMarkers.Clear();
         }
 
@@ -162,6 +177,13 @@ namespace WrightAngle.Waypoint
                 // Calculate distance for visibility checks.
                 float distance = CalculateDistance(cameraPosition, targetWorldPos);
 
+                // Skip paused targets (hidden via SetTargetActive).
+                if (pausedTargets.Contains(target))
+                {
+                    TryReleaseMarker(target);
+                    continue;
+                }
+
                 // Hide marker and skip further processing if beyond the maximum visible distance.
                 if (distance > settings.MaxVisibleDistance)
                 {
@@ -193,6 +215,7 @@ namespace WrightAngle.Waypoint
                     {
                         markerInstance = markerPool.Get(); // Get from pool (activates the GameObject).
                         activeMarkers.Add(target, markerInstance); // Associate the new marker with the target.
+                        OnMarkerCreated?.Invoke(target, markerInstance); // Notify listeners.
                     }
                     // Ensure the marker's GameObject is active (could be inactive if just retrieved from pool).
                     if (!markerInstance.gameObject.activeSelf) markerInstance.gameObject.SetActive(true);
@@ -225,6 +248,59 @@ namespace WrightAngle.Waypoint
                 // Calculate standard 3D distance.
                 return Vector3.Distance(camPos, targetPos);
             }
+        }
+
+        // --- Public API ---
+
+        /// <summary>
+        /// Explicitly registers a target with the waypoint system, making it eligible for marker display.
+        /// Use this instead of relying on static events for more predictable behavior.
+        /// </summary>
+        /// <param name="target">The WaypointTarget to register.</param>
+        public void Register(WaypointTarget target) => RegisterTarget(target);
+
+        /// <summary>
+        /// Explicitly unregisters a target from the waypoint system, releasing its marker.
+        /// Use this instead of relying on static events for more predictable behavior.
+        /// </summary>
+        /// <param name="target">The WaypointTarget to unregister.</param>
+        public void Unregister(WaypointTarget target)
+        {
+            int index = activeTargetList.IndexOf(target);
+            RemoveTargetCompletely(target, index);
+        }
+
+        /// <summary>
+        /// Temporarily shows or hides a registered target's marker without fully unregistering.
+        /// Useful for toggling visibility based on game state (e.g., menu open, cutscene).
+        /// </summary>
+        /// <param name="target">The target to show/hide.</param>
+        /// <param name="active">True to show, false to hide.</param>
+        public void SetTargetActive(WaypointTarget target, bool active)
+        {
+            if (target == null || !activeTargetSet.Contains(target)) return;
+
+            if (active)
+            {
+                pausedTargets.Remove(target);
+            }
+            else
+            {
+                pausedTargets.Add(target);
+                TryReleaseMarker(target); // Immediately hide the marker.
+            }
+        }
+
+        /// <summary>
+        /// Attempts to retrieve the active marker UI for a given target.
+        /// Returns false if the target has no active marker (off-screen, too far, or not registered).
+        /// </summary>
+        /// <param name="target">The target to query.</param>
+        /// <param name="marker">The marker instance if found, null otherwise.</param>
+        /// <returns>True if a marker was found, false otherwise.</returns>
+        public bool TryGetMarker(WaypointTarget target, out WaypointMarkerUI marker)
+        {
+            return activeMarkers.TryGetValue(target, out marker);
         }
 
         // --- Target Management ---
@@ -282,6 +358,7 @@ namespace WrightAngle.Waypoint
                 // Only release to pool if the marker still exists (wasn't destroyed externally).
                 if (markerToRelease != null)
                 {
+                    OnMarkerReleased?.Invoke(target, markerToRelease); // Notify listeners before releasing.
                     markerPool.Release(markerToRelease); // Return the marker to the pool (deactivates the GameObject).
                 }
             }
@@ -290,7 +367,11 @@ namespace WrightAngle.Waypoint
         /// <summary> Removes a target completely from all tracking lists and ensures its marker is released. </summary>
         private void RemoveTargetCompletely(WaypointTarget target, int listIndex = -1)
         {
-            if (target != null) target.SetRegisteredByManager(false);
+            if (target != null)
+            {
+                target.SetRegisteredByManager(false);
+                pausedTargets.Remove(target); // Clean up paused state.
+            }
 
             // Ensure the marker is released back to the pool first.
             TryReleaseMarker(target);

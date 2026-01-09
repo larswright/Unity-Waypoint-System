@@ -36,10 +36,14 @@ namespace WrightAngle.Waypoint
         // --- Static Events for Communication with WaypointUIManager ---
         // These events allow the target to notify the manager when its state changes,
         // decoupling the components.
+        // NOTE: These are marked obsolete to encourage using the new explicit API.
+        // They are still functional for backwards compatibility.
 
         /// <summary> Fired when this target should become active and tracked by the manager. </summary>
+        [Obsolete("Use WaypointUIManager.Register() directly for more predictable behavior. Static events will be removed in a future version.")]
         public static event Action<WaypointTarget> OnTargetEnabled;
         /// <summary> Fired when this target should become inactive and untracked by the manager. </summary>
+        [Obsolete("Use WaypointUIManager.Unregister() directly for more predictable behavior. Static events will be removed in a future version.")]
         public static event Action<WaypointTarget> OnTargetDisabled;
 
         // --- Unity Lifecycle Callbacks ---
@@ -69,7 +73,9 @@ namespace WrightAngle.Waypoint
             }
 
             // Notify the WaypointUIManager (or other listeners) to start tracking this target.
+#pragma warning disable CS0618 // Obsolete warning suppressed - event still fires for backwards compatibility
             OnTargetEnabled?.Invoke(this);
+#pragma warning restore CS0618
         }
 
         /// <summary>
@@ -95,7 +101,9 @@ namespace WrightAngle.Waypoint
             if (!IsRegistered) return;
 
             // Notify the WaypointUIManager (or other listeners) to stop tracking this target.
+#pragma warning disable CS0618 // Obsolete warning suppressed - event still fires for backwards compatibility
             OnTargetDisabled?.Invoke(this);
+#pragma warning restore CS0618
         }
 
 
