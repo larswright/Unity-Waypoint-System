@@ -76,6 +76,12 @@ namespace WrightAngle.Waypoint
             WaypointTarget.OnTargetEnabled -= HandleTargetEnabled;
             WaypointTarget.OnTargetDisabled -= HandleTargetDisabled;
 
+            // Ensure tracked targets don't keep stale "registered" state when the manager is gone.
+            foreach (WaypointTarget target in activeTargetSet)
+            {
+                if (target != null) target.SetRegisteredByManager(false);
+            }
+
             // Clear and dispose of the object pool and internal tracking collections.
             markerPool?.Clear();
             markerPool?.Dispose();
@@ -211,13 +217,25 @@ namespace WrightAngle.Waypoint
         /// <summary> Adds a target to the internal tracking collections if it's not already tracked. </summary>
         private void RegisterTarget(WaypointTarget target)
         {
+            if (target == null) return;
+
+            // Only track targets that are currently active.
+            if (!target.gameObject.activeInHierarchy)
+            {
+                target.SetRegisteredByManager(false);
+                return;
+            }
+
             // Use HashSet.Add for an efficient way to add only if the target isn't already present.
-            if (target != null && activeTargetSet.Add(target))
+            if (activeTargetSet.Add(target))
             {
                 // If successfully added to the set, also add to the list used for iteration.
                 activeTargetList.Add(target);
                 // Note: The UI marker itself is only fetched from the pool when needed during the Update loop.
             }
+
+            // WaypointUIManager is the source of truth for whether a target is tracked.
+            target.SetRegisteredByManager(true);
         }
 
         /// <summary> Attempts to find the marker associated with a target and releases it back to the pool. </summary>
@@ -234,6 +252,8 @@ namespace WrightAngle.Waypoint
         /// <summary> Removes a target completely from all tracking lists and ensures its marker is released. </summary>
         private void RemoveTargetCompletely(WaypointTarget target, int listIndex = -1)
         {
+            if (target != null) target.SetRegisteredByManager(false);
+
             // Ensure the marker is released back to the pool first.
             TryReleaseMarker(target);
 

@@ -6,7 +6,7 @@ namespace WrightAngle.Waypoint
     /// <summary>
     /// Marks a GameObject as a target for the Waypoint System. Attach this component
     /// to any object in your scene that you want a waypoint marker to point towards.
-    /// Automatically registers with the WaypointUIManager based on the 'ActivateOnStart' setting,
+    /// Is automatically registered by the WaypointUIManager based on the 'ActivateOnStart' setting,
     /// or can be controlled manually via script.
     /// </summary>
     [AddComponentMenu("WrightAngle/Waypoint Target")]
@@ -15,13 +15,23 @@ namespace WrightAngle.Waypoint
         [Tooltip("An optional name for this waypoint, primarily for identification in the editor or scripts.")]
         public string DisplayName = "";
 
-        [Tooltip("If checked, this waypoint target will automatically register itself with the WaypointUIManager when the scene starts (requires a WaypointUIManager in the scene). Uncheck to control activation manually using the ActivateWaypoint() method.")]
+        [Tooltip("If checked, this waypoint target will be automatically registered by the WaypointUIManager when the scene starts (requires a WaypointUIManager in the scene). Uncheck to control activation manually using the ActivateWaypoint() method.")]
         public bool ActivateOnStart = true;
 
         /// <summary>
         /// Indicates whether this target is currently registered and being tracked by the WaypointUIManager. (Read-Only)
+        /// This state is owned by the WaypointUIManager and should not be set by user code.
         /// </summary>
         public bool IsRegistered { get; private set; } = false;
+
+        /// <summary>
+        /// Internal hook used by the WaypointUIManager to keep the target's read-only state in sync
+        /// with the actual tracking collections.
+        /// </summary>
+        internal void SetRegisteredByManager(bool isRegistered)
+        {
+            IsRegistered = isRegistered;
+        }
 
         // --- Static Events for Communication with WaypointUIManager ---
         // These events allow the target to notify the manager when its state changes,
@@ -40,14 +50,14 @@ namespace WrightAngle.Waypoint
 
         private void OnDisable()
         {
-            // Ensures the target is always unregistered if the component or its GameObject is disabled.
+            // Ensure the manager stops tracking this target if the component or its GameObject is disabled.
             ProcessDeactivation();
         }
 
         // --- Public API ---
 
         /// <summary>
-        /// Manually registers this waypoint target with the system, making it eligible for tracking.
+        /// Requests that this waypoint target becomes tracked by the system.
         /// Use this if 'ActivateOnStart' is disabled. Has no effect if already registered or inactive.
         /// </summary>
         public void ActivateWaypoint()
@@ -60,11 +70,10 @@ namespace WrightAngle.Waypoint
 
             // Notify the WaypointUIManager (or other listeners) to start tracking this target.
             OnTargetEnabled?.Invoke(this);
-            IsRegistered = true; // Update internal state.
         }
 
         /// <summary>
-        /// Manually unregisters this waypoint target from the system, hiding its marker.
+        /// Requests that this waypoint target stops being tracked by the system, hiding its marker.
         /// This allows hiding a marker without disabling the target GameObject itself.
         /// Has no effect if not currently registered.
         /// </summary>
@@ -77,8 +86,8 @@ namespace WrightAngle.Waypoint
         // --- Internal Logic ---
 
         /// <summary>
-        /// Contains the shared logic for unregistering the target. Updates the internal state
-        /// and notifies listeners via the OnTargetDisabled event. Prevents multiple notifications.
+        /// Contains the shared logic for untracking the target and notifying listeners via the
+        /// OnTargetDisabled event. Prevents multiple notifications.
         /// </summary>
         private void ProcessDeactivation()
         {
@@ -87,7 +96,6 @@ namespace WrightAngle.Waypoint
 
             // Notify the WaypointUIManager (or other listeners) to stop tracking this target.
             OnTargetDisabled?.Invoke(this);
-            IsRegistered = false; // Update internal state.
         }
 
 
