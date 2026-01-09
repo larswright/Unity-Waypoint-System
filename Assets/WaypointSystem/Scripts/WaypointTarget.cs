@@ -18,6 +18,41 @@ namespace WrightAngle.Waypoint
         [Tooltip("If checked, this waypoint target will be automatically registered by the WaypointUIManager when the scene starts (requires a WaypointUIManager in the scene). Uncheck to control activation manually using the ActivateWaypoint() method.")]
         public bool ActivateOnStart = true;
 
+        [Tooltip("Offset applied to the target's position in world space. Use this to make the marker track slightly above or beside the actual transform position (e.g., above a character's head).")]
+        public Vector3 WorldOffset = Vector3.zero;
+
+        [Header("Appearance")]
+        [Tooltip("Optional preset defining this waypoint's visual style. If null, uses the default prefab appearance.")]
+        [SerializeField] private WaypointPreset preset;
+
+        /// <summary>
+        /// Fired when the preset is changed at runtime via SetPreset().
+        /// The WaypointUIManager listens to this to update marker visuals.
+        /// </summary>
+        public event System.Action<WaypointTarget> OnPresetChanged;
+
+        /// <summary>
+        /// Gets the current visual preset for this waypoint. May be null for default appearance.
+        /// </summary>
+        public WaypointPreset Preset => preset;
+
+        /// <summary>
+        /// Sets the visual preset at runtime and notifies the system to update marker visuals.
+        /// </summary>
+        /// <param name="newPreset">The new preset to apply, or null for default appearance.</param>
+        public void SetPreset(WaypointPreset newPreset)
+        {
+            if (preset == newPreset) return;
+            preset = newPreset;
+            OnPresetChanged?.Invoke(this);
+        }
+
+        /// <summary>
+        /// Returns the target's world position with the offset applied.
+        /// This is the position that the waypoint marker will track.
+        /// </summary>
+        public Vector3 TargetPosition => transform.position + WorldOffset;
+
         /// <summary>
         /// Indicates whether this target is currently registered and being tracked by the WaypointUIManager. (Read-Only)
         /// This state is owned by the WaypointUIManager and should not be set by user code.
@@ -111,15 +146,24 @@ namespace WrightAngle.Waypoint
         // Provides visual feedback in the Scene view when the object is selected.
         private void OnDrawGizmosSelected()
         {
-            // Draw a wire sphere gizmo around the target's position.
+            // Draw a wire sphere gizmo at the actual tracked position (with offset applied).
             // Color changes based on whether it's currently registered with the manager.
             Gizmos.color = IsRegistered ? Color.green : Color.yellow;
-            Gizmos.DrawWireSphere(transform.position, 0.5f);
+            Gizmos.DrawWireSphere(TargetPosition, 0.5f);
+            
+            // If offset is applied, draw a line from transform to offset position for clarity.
+            if (WorldOffset.sqrMagnitude > 0.0001f)
+            {
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawLine(transform.position, TargetPosition);
+                // Draw a small sphere at the actual transform position.
+                Gizmos.DrawWireSphere(transform.position, 0.15f);
+            }
 #if UNITY_EDITOR
             // Display a helpful label above the target in the Scene view.
             string label = $"Waypoint: {gameObject.name}";
             if (!ActivateOnStart) label += " (Manual Activation)";
-            UnityEditor.Handles.Label(transform.position + Vector3.up * 0.7f, label);
+            UnityEditor.Handles.Label(TargetPosition + Vector3.up * 0.7f, label);
 #endif
         }
     } // End Class

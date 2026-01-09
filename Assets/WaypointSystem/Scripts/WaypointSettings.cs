@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace WrightAngle.Waypoint
 {
@@ -38,6 +39,10 @@ namespace WrightAngle.Waypoint
         [Range(0f, 100f)]
         public float ScreenEdgeMargin = 50f;
 
+        [Tooltip("Additional padding (in pixels) added to ScreenEdgeMargin to prevent distance text from going off-screen. Set this based on your text size.")]
+        [Range(0f, 150f)]
+        public float TextEdgePadding = 40f;
+
         [Tooltip("Enable this to flip the off-screen marker's vertical orientation. Useful if your marker icon naturally points downwards.")]
         public bool FlipOffScreenMarkerY = false;
 
@@ -57,8 +62,16 @@ namespace WrightAngle.Waypoint
         [Range(0f, 1f)]
         public float MinScaleFactor = 0.3f;
 
-        [Tooltip("Enable to smoothly fade out markers when approaching MinScaleDistance instead of abruptly hiding.")]
-        public bool UseFadeAtMinDistance = true;
+        [FormerlySerializedAs("UseFadeAtMinDistance")]
+        [Tooltip("Enable to smoothly fade out markers when approaching MaxScaleDistance instead of abruptly hiding.")]
+        public bool UseFadeAtMaxDistance = true;
+
+        [System.Obsolete("UseFadeAtMinDistance has been renamed to UseFadeAtMaxDistance.")]
+        public bool UseFadeAtMinDistance
+        {
+            get => UseFadeAtMaxDistance;
+            set => UseFadeAtMaxDistance = value;
+        }
 
         [Tooltip("Distance range over which the marker fades out when approaching MaxScaleDistance. Fade starts at (MaxScaleDistance - FadeRange) and ends at MaxScaleDistance.")]
         [Min(0.1f)]

@@ -26,6 +26,12 @@ namespace WrightAngle.Waypoint
         private CanvasGroup canvasGroup; // Used for efficient alpha fading
         private bool hasDistanceText; // Cached flag to avoid null checks every frame
         private Vector3 baseScale; // Original scale for reference
+        private float currentScaleMultiplier = 1f;
+
+        // Preset system: cached defaults for reset
+        private Sprite defaultSprite;
+        private Color defaultColor;
+        private WaypointPreset currentPreset;
 
         /// <summary>
         /// Checks if the markerIcon is assigned. Used by WaypointUIManager for prefab validation.
@@ -66,8 +72,62 @@ namespace WrightAngle.Waypoint
                 }
             }
 
+            // Cache default appearance for preset reset
+            defaultSprite = markerIcon.sprite;
+            defaultColor = markerIcon.color;
+
             // Optimize performance by disabling raycast target for the icon (markers are typically non-interactive)
             markerIcon.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// Applies visual settings from a preset. Called when marker is assigned to a target.
+        /// Pass null to reset to default prefab appearance.
+        /// </summary>
+        /// <param name="preset">The preset to apply, or null for default appearance.</param>
+        /// <param name="isOnScreen">Current on/off-screen state for icon selection.</param>
+        public void ApplyPreset(WaypointPreset preset, bool isOnScreen = true)
+        {
+            currentPreset = preset;
+            
+            if (preset != null)
+            {
+                currentScaleMultiplier = preset.ScaleMultiplier;
+                // Apply preset visuals
+                Sprite icon = preset.GetIcon(isOnScreen);
+                if (icon != null)
+                    markerIcon.sprite = icon;
+                else if (defaultSprite != null)
+                    markerIcon.sprite = defaultSprite;
+                    
+                markerIcon.color = preset.GetColor(isOnScreen);
+                
+                // Apply scale multiplier
+                rectTransform.localScale = baseScale * currentScaleMultiplier;
+            }
+            else
+            {
+                currentScaleMultiplier = 1f;
+                // Reset to defaults
+                if (defaultSprite != null)
+                    markerIcon.sprite = defaultSprite;
+                markerIcon.color = defaultColor;
+                rectTransform.localScale = baseScale;
+            }
+        }
+
+        /// <summary>
+        /// Updates the icon based on on/off-screen state when preset has different icons.
+        /// Called during UpdateDisplay when screen state changes.
+        /// </summary>
+        private void UpdatePresetForScreenState(bool isOnScreen)
+        {
+            if (currentPreset == null) return;
+            
+            Sprite icon = currentPreset.GetIcon(isOnScreen);
+            if (icon != null)
+                markerIcon.sprite = icon;
+            markerIcon.color = currentPreset.GetColor(isOnScreen);
         }
 
         /// <summary>
@@ -116,6 +176,9 @@ namespace WrightAngle.Waypoint
                     distanceTextUI.UpdateDistance(distance, true);
                 }
                 
+                // Update preset icon/color for on-screen state
+                UpdatePresetForScreenState(true);
+                
                 if (!gameObject.activeSelf) gameObject.SetActive(true); // Ensure marker is visible
             }
             else // --- Target OFF Screen ---
@@ -129,11 +192,21 @@ namespace WrightAngle.Waypoint
 
                 if (!gameObject.activeSelf) gameObject.SetActive(true); // Ensure marker is visible
 
+                // Update preset icon/color for off-screen state
+                UpdatePresetForScreenState(false);
+
                 // --- Calculate Off-Screen Position and Rotation ---
                 // Convert margin from pixels to local units using parent rect scale
                 // This ensures consistent margins regardless of CanvasScaler settings
                 float pixelToLocalScale = parentBounds.width / cam.pixelWidth;
-                float localMargin = settings.ScreenEdgeMargin * pixelToLocalScale;
+                
+                // Add extra padding for distance text to prevent it from going off-screen
+                float totalMargin = settings.ScreenEdgeMargin;
+                if (hasDistanceText)
+                {
+                    totalMargin += settings.TextEdgePadding;
+                }
+                float localMargin = totalMargin * pixelToLocalScale;
                 
                 // Screen center in pixels for direction calculations
                 Vector2 screenCenter = new Vector2(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f);
@@ -227,7 +300,7 @@ namespace WrightAngle.Waypoint
                 else
                 {
                     // Keep full scale and alpha for off-screen visibility
-                    rectTransform.localScale = baseScale;
+                    rectTransform.localScale = baseScale * currentScaleMultiplier;
                     canvasGroup.alpha = 1f;
                 }
                 
@@ -248,7 +321,7 @@ namespace WrightAngle.Waypoint
             if (!settings.UseDistanceScaling)
             {
                 // Reset to base scale and full alpha when scaling is disabled
-                rectTransform.localScale = baseScale;
+                rectTransform.localScale = baseScale * currentScaleMultiplier;
                 canvasGroup.alpha = 1f;
                 return;
             }
@@ -259,7 +332,7 @@ namespace WrightAngle.Waypoint
             // Prevent division by zero
             if (scaleRange <= 0.001f)
             {
-                rectTransform.localScale = baseScale;
+                rectTransform.localScale = baseScale * currentScaleMultiplier;
                 canvasGroup.alpha = 1f;
                 return;
             }
@@ -270,11 +343,11 @@ namespace WrightAngle.Waypoint
             
             // Calculate scale: full size when close (low normalizedDistance), smaller when far
             float scaleFactor = Mathf.Lerp(1f, settings.MinScaleFactor, normalizedDistance);
-            rectTransform.localScale = baseScale * scaleFactor;
+            rectTransform.localScale = baseScale * currentScaleMultiplier * scaleFactor;
             
             // Calculate alpha/fade when approaching maximum distance (far away)
             float alpha = 1f;
-            if (settings.UseFadeAtMinDistance && distance > settings.MaxScaleDistance - settings.FadeRange)
+            if (settings.UseFadeAtMaxDistance && distance > settings.MaxScaleDistance - settings.FadeRange)
             {
                 // Fade from 1 at (MaxScaleDistance - FadeRange) to 0 at MaxScaleDistance
                 alpha = Mathf.Clamp01((settings.MaxScaleDistance - distance) / settings.FadeRange);

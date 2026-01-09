@@ -27,7 +27,7 @@ MonoBehaviour:
   DecimalThreshold: 10
   MinDisplayDistance: 0
   HideWhenOffScreen: 0
-  TextColor: {r: 1, g: 1, b: 1, a: 1}
+  TextColor: {r: 1, g: 0, b: 0, a: 1}
   UseDistanceColors: 0
   CloseColor: {r: 0, g: 1, b: 0, a: 1}
   FarColor: {r: 1, g: 0, b: 0, a: 1}

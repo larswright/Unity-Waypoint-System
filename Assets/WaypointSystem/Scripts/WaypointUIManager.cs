@@ -171,8 +171,8 @@ namespace WrightAngle.Waypoint
                 }
 
                 // --- Core Waypoint Logic ---
-                Transform targetTransform = target.transform;
-                Vector3 targetWorldPos = targetTransform.position;
+                // Use TargetPosition which includes the WorldOffset for accurate marker placement.
+                Vector3 targetWorldPos = target.TargetPosition;
 
                 // Calculate distance for visibility checks.
                 float distance = CalculateDistance(cameraPosition, targetWorldPos);
@@ -215,6 +215,8 @@ namespace WrightAngle.Waypoint
                     {
                         markerInstance = markerPool.Get(); // Get from pool (activates the GameObject).
                         activeMarkers.Add(target, markerInstance); // Associate the new marker with the target.
+                        // Apply target's preset to the newly assigned marker
+                        markerInstance.ApplyPreset(target.Preset, isOnScreen);
                         OnMarkerCreated?.Invoke(target, markerInstance); // Notify listeners.
                     }
                     // Ensure the marker's GameObject is active (could be inactive if just retrieved from pool).
@@ -303,6 +305,33 @@ namespace WrightAngle.Waypoint
             return activeMarkers.TryGetValue(target, out marker);
         }
 
+        /// <summary>
+        /// Forces a refresh of the marker's visual preset. Call this after changing a target's preset
+        /// at runtime if using direct property assignment instead of SetPreset().
+        /// </summary>
+        /// <param name="target">The target whose marker should be refreshed.</param>
+        public void RefreshMarker(WaypointTarget target)
+        {
+            if (target == null) return;
+            if (activeMarkers.TryGetValue(target, out WaypointMarkerUI marker))
+            {
+                marker.ApplyPreset(target.Preset);
+            }
+        }
+
+        /// <summary>
+        /// Convenience method to change a target's preset and immediately refresh its marker.
+        /// Combines SetPreset() on target and RefreshMarker() in one call.
+        /// </summary>
+        /// <param name="target">The target to update.</param>
+        /// <param name="preset">The new preset to apply, or null for default appearance.</param>
+        public void SetTargetPreset(WaypointTarget target, WaypointPreset preset)
+        {
+            if (target == null) return;
+            target.SetPreset(preset);
+            // SetPreset fires OnPresetChanged which triggers RefreshMarker via event handler
+        }
+
         // --- Target Management ---
 
         /// <summary> Scans the scene at startup for WaypointTargets configured to 'ActivateOnStart'. </summary>
@@ -341,11 +370,19 @@ namespace WrightAngle.Waypoint
             {
                 // If successfully added to the set, also add to the list used for iteration.
                 activeTargetList.Add(target);
+                // Subscribe to preset changes for automatic marker refresh
+                target.OnPresetChanged += HandlePresetChanged;
                 // Note: The UI marker itself is only fetched from the pool when needed during the Update loop.
             }
 
             // WaypointUIManager is the source of truth for whether a target is tracked.
             target.SetRegisteredByManager(true);
+        }
+
+        /// <summary> Handles runtime preset changes by refreshing the target's marker visuals. </summary>
+        private void HandlePresetChanged(WaypointTarget target)
+        {
+            RefreshMarker(target);
         }
 
         /// <summary> Attempts to find the marker associated with a target and releases it back to the pool. </summary>
@@ -370,6 +407,7 @@ namespace WrightAngle.Waypoint
             if (target != null)
             {
                 target.SetRegisteredByManager(false);
+                target.OnPresetChanged -= HandlePresetChanged; // Unsubscribe from preset changes
                 pausedTargets.Remove(target); // Clean up paused state.
             }
 
