@@ -32,6 +32,7 @@ namespace WrightAngle.Waypoint
         private Dictionary<WaypointTarget, WaypointMarkerUI> activeMarkers = new Dictionary<WaypointTarget, WaypointMarkerUI>(); // Maps a target to its active UI marker.
 
         private Camera _cachedWaypointCamera; // Cached camera reference for performance.
+        private Camera _cachedUICamera;        // Cached UI camera for RectTransformUtility conversions (null for Screen Space - Overlay).
         private float lastUpdateTime = -1f;   // Used for update throttling based on UpdateFrequency.
         private bool isInitialized = false;   // Flag to prevent updates before successful initialization.
 
@@ -50,6 +51,15 @@ namespace WrightAngle.Waypoint
 
             // Cache valid references.
             _cachedWaypointCamera = waypointCamera;
+            // Cache the UI camera based on Canvas render mode.
+            // For Screen Space - Overlay, RectTransformUtility expects null.
+            // For Screen Space - Camera and World Space, use the assigned camera.
+            Canvas parentCanvas = markerParentCanvas.GetComponentInParent<Canvas>();
+            if (parentCanvas != null)
+            {
+                _cachedUICamera = (parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay) ? null : parentCanvas.worldCamera;
+            }
+            
             // Set up the object pool for marker UI elements.
             InitializePool();
 
@@ -182,7 +192,8 @@ namespace WrightAngle.Waypoint
 
                     // --- Update Marker Visuals ---
                     // Call the marker's UpdateDisplay method to set its position and rotation.
-                    markerInstance.UpdateDisplay(screenPos, isOnScreen, isBehindCamera, _cachedWaypointCamera, settings);
+                    // Pass the parent RectTransform and UI camera for proper coordinate conversion.
+                    markerInstance.UpdateDisplay(screenPos, isOnScreen, isBehindCamera, _cachedWaypointCamera, settings, markerParentCanvas, _cachedUICamera);
                 }
                 else // Marker should not be shown (e.g., off-screen and indicators disabled).
                 {
@@ -259,8 +270,12 @@ namespace WrightAngle.Waypoint
             // Check if the target is valid and if there's an active marker mapped to it.
             if (target != null && activeMarkers.TryGetValue(target, out WaypointMarkerUI markerToRelease))
             {
-                markerPool.Release(markerToRelease); // Return the marker to the pool (deactivates the GameObject).
-                activeMarkers.Remove(target);        // Remove the association from the dictionary.
+                activeMarkers.Remove(target); // Remove the association from the dictionary first.
+                // Only release to pool if the marker still exists (wasn't destroyed externally).
+                if (markerToRelease != null)
+                {
+                    markerPool.Release(markerToRelease); // Return the marker to the pool (deactivates the GameObject).
+                }
             }
         }
 
@@ -315,8 +330,8 @@ namespace WrightAngle.Waypoint
                     go.SetActive(false); // Ensure new instances start inactive.
                     return ui;
                 },
-                actionOnGet: (marker) => marker.gameObject.SetActive(true),    // Action performed when an item is taken from the pool.
-                actionOnRelease: (marker) => marker.gameObject.SetActive(false), // Action performed when an item is returned to the pool.
+                actionOnGet: (marker) => { if (marker != null && marker.gameObject != null) marker.gameObject.SetActive(true); },    // Action performed when an item is taken from the pool.
+                actionOnRelease: (marker) => { if (marker != null && marker.gameObject != null) marker.gameObject.SetActive(false); }, // Action performed when an item is returned to the pool.
                 actionOnDestroy: (marker) => { if (marker != null) Destroy(marker.gameObject); }, // Action performed when the pool destroys an item.
                 collectionCheck: true, // Adds extra checks in editor builds to detect pool corruption issues.
                 defaultCapacity: 10,   // Initial number of items the pool can hold.

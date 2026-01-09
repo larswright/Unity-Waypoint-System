@@ -55,28 +55,39 @@ namespace WrightAngle.Waypoint
         /// <summary>
         /// Updates the marker's position and rotation based on the target's screen-space information.
         /// Called frequently by the WaypointUIManager.
+        /// Uses RectTransformUtility for proper handling of all Canvas render modes (Screen Space - Overlay,
+        /// Screen Space - Camera, World Space) and CanvasScaler configurations.
         /// </summary>
         /// <param name="screenPosition">Target's projected position on the screen (can be off-screen).</param>
         /// <param name="isOnScreen">Indicates if the target is currently within the camera's viewport.</param>
         /// <param name="isBehindCamera">Indicates if the target is located behind the camera.</param>
         /// <param name="cam">The reference camera used for calculations.</param>
         /// <param name="settings">The active WaypointSettings asset providing configuration.</param>
-        public void UpdateDisplay(Vector3 screenPosition, bool isOnScreen, bool isBehindCamera, Camera cam, WaypointSettings settings)
+        /// <param name="parentRect">The parent RectTransform used for local coordinate conversion and clamping.</param>
+        /// <param name="uiCamera">The camera rendering the UI Canvas (null for Screen Space - Overlay).</param>
+        public void UpdateDisplay(Vector3 screenPosition, bool isOnScreen, bool isBehindCamera, Camera cam, WaypointSettings settings, RectTransform parentRect, Camera uiCamera)
         {
             // Safety checks for required components and settings
-            if (settings == null || rectTransform == null || cam == null || markerIcon == null)
+            if (settings == null || rectTransform == null || cam == null || markerIcon == null || parentRect == null)
             {
                 if (gameObject.activeSelf) gameObject.SetActive(false); // Hide if setup is invalid
                 return;
             }
 
+            // Get parent rectangle bounds for clamping (in local coordinates)
+            Rect parentBounds = parentRect.rect;
+
             if (isOnScreen)
             {
                 // --- Target ON Screen ---
-                // Position the marker directly at the target's screen position.
-                rectTransform.position = screenPosition;
-                // Ensure no rotation is applied for on-screen markers.
-                rectTransform.rotation = Quaternion.identity;
+                // Convert screen position to local position within the parent RectTransform.
+                // This properly handles all Canvas render modes and CanvasScaler configurations.
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, screenPosition, uiCamera, out Vector2 localPoint))
+                {
+                    rectTransform.anchoredPosition = localPoint;
+                }
+                // Ensure no rotation is applied for on-screen markers (local to canvas).
+                rectTransform.localRotation = Quaternion.identity;
                 if (!gameObject.activeSelf) gameObject.SetActive(true); // Ensure marker is visible
             }
             else // --- Target OFF Screen ---
@@ -91,10 +102,22 @@ namespace WrightAngle.Waypoint
                 if (!gameObject.activeSelf) gameObject.SetActive(true); // Ensure marker is visible
 
                 // --- Calculate Off-Screen Position and Rotation ---
-                float margin = settings.ScreenEdgeMargin;
+                // Convert margin from pixels to local units using parent rect scale
+                // This ensures consistent margins regardless of CanvasScaler settings
+                float pixelToLocalScale = parentBounds.width / cam.pixelWidth;
+                float localMargin = settings.ScreenEdgeMargin * pixelToLocalScale;
+                
+                // Screen center in pixels for direction calculations
                 Vector2 screenCenter = new Vector2(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f);
-                // Define the clamping boundaries based on screen size and margin.
-                Rect screenBounds = new Rect(margin, margin, cam.pixelWidth - (margin * 2f), cam.pixelHeight - (margin * 2f));
+                
+                // Define clamping boundaries in local coordinates (relative to parent center)
+                // parentBounds.xMin/yMin are typically negative, xMax/yMax positive when anchored at center
+                Rect localBounds = new Rect(
+                    parentBounds.xMin + localMargin,
+                    parentBounds.yMin + localMargin,
+                    parentBounds.width - (localMargin * 2f),
+                    parentBounds.height - (localMargin * 2f)
+                );
 
                 Vector3 positionToClamp; // The position used for boundary intersection calculation.
                 Vector2 directionForRotation; // Direction the marker icon should point towards.
@@ -128,10 +151,26 @@ namespace WrightAngle.Waypoint
                 }
 
                 // --- Clamping to Screen Edge ---
-                // Calculate the precise intersection point with the screen bounds rectangle.
-                Vector2 clampedPosition = IntersectWithScreenBounds(screenCenter, positionToClamp, screenBounds);
-                // Apply the clamped position to the marker.
-                rectTransform.position = new Vector3(clampedPosition.x, clampedPosition.y, 0f);
+                // First convert the position to clamp into local coordinates
+                Vector2 localPositionToClamp;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, positionToClamp, uiCamera, out localPositionToClamp))
+                {
+                    // Get local center point for intersection calculation
+                    Vector2 localCenter = Vector2.zero; // Parent center in local coords is (0,0) when using anchoredPosition
+                    
+                    // Calculate the precise intersection point with the local bounds rectangle.
+                    Vector2 clampedLocalPosition = IntersectWithLocalBounds(localCenter, localPositionToClamp, localBounds);
+                    // Apply the clamped position to the marker using anchoredPosition.
+                    rectTransform.anchoredPosition = clampedLocalPosition;
+                }
+                else
+                {
+                    // Fallback: simple clamp if conversion fails
+                    rectTransform.anchoredPosition = new Vector2(
+                        Mathf.Clamp(0, localBounds.xMin, localBounds.xMax),
+                        Mathf.Clamp(0, localBounds.yMin, localBounds.yMax)
+                    );
+                }
 
                 // --- Rotation ---
                 // Rotate the marker icon to point towards the target's direction.
@@ -142,25 +181,28 @@ namespace WrightAngle.Waypoint
                     // Determine flip adjustment based on settings.
                     float flipAngle = settings.FlipOffScreenMarkerY ? 180f : 0f;
                     // Apply rotation, assuming the icon points 'up' by default (-90 degrees offset). Adjust offset if your icon points differently.
-                    rectTransform.rotation = Quaternion.Euler(0, 0, angle + flipAngle - 90f);
+                    // Use localRotation to stay upright relative to the Canvas (important for Screen Space - Camera).
+                    rectTransform.localRotation = Quaternion.Euler(0, 0, angle + flipAngle - 90f);
                 }
                 else // Handle case where direction is zero (e.g., exactly behind center).
                 {
                     float flipAngle = settings.FlipOffScreenMarkerY ? 180f : 0f;
                     // Default rotation points down, adjust based on flip setting.
-                    rectTransform.rotation = Quaternion.Euler(0, 0, -180f + flipAngle);
+                    // Use localRotation to stay upright relative to the Canvas.
+                    rectTransform.localRotation = Quaternion.Euler(0, 0, -180f + flipAngle);
                 }
             }
         }
 
         /// <summary>
-        /// Calculates the exact intersection point of a line (from screen center towards a target point)
-        /// with the edges of a rectangular boundary. Ensures accurate clamping to the screen edge.
+        /// Calculates the exact intersection point of a line (from center towards a target point)
+        /// with the edges of a rectangular boundary in local coordinates.
+        /// Ensures accurate clamping to the parent rect edge.
         /// </summary>
-        private Vector2 IntersectWithScreenBounds(Vector2 center, Vector2 targetPoint, Rect bounds)
+        private Vector2 IntersectWithLocalBounds(Vector2 center, Vector2 targetPoint, Rect bounds)
         {
             Vector2 direction = (targetPoint - center).normalized;
-            // Handle zero direction vector edge case.
+            // Handle zero direction vector edge case - return bottom center of bounds
             if (direction.sqrMagnitude < 0.0001f) return new Vector2(bounds.center.x, bounds.yMin);
 
             // Calculate potential intersection distances ('t' values) along the direction vector for each edge.
@@ -179,7 +221,7 @@ namespace WrightAngle.Waypoint
             // Fallback if no valid intersection is found (should be rare with correct inputs).
             if (float.IsInfinity(minT))
             {
-                Debug.LogWarning("WaypointMarkerUI: Could not find screen bounds intersection. Using fallback clamping.", this);
+                Debug.LogWarning("WaypointMarkerUI: Could not find local bounds intersection. Using fallback clamping.", this);
                 return new Vector2(Mathf.Clamp(targetPoint.x, bounds.xMin, bounds.xMax),
                                    Mathf.Clamp(targetPoint.y, bounds.yMin, bounds.yMax));
             }
