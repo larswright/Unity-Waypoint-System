@@ -96,9 +96,24 @@ namespace WrightAngle.Waypoint
             bool error = false;
             if (waypointCamera == null) { Debug.LogError("WaypointUIManager Error: Waypoint Camera not assigned!", this); error = true; }
             if (settings == null) { Debug.LogError("WaypointUIManager Error: WaypointSettings not assigned!", this); error = true; }
-            else if (settings.GetMarkerPrefab() == null) { Debug.LogError($"WaypointUIManager Error: Marker Prefab missing in WaypointSettings '{settings.name}'!", this); error = true; } // Check prefab validity.
+            else if (settings.GetMarkerPrefab() == null) { Debug.LogError($"WaypointUIManager Error: Marker Prefab missing in WaypointSettings '{settings.name}'!", this); error = true; }
+            else
+            {
+                // Validate that the prefab has WaypointMarkerUI component properly configured.
+                WaypointMarkerUI prefabMarkerUI = settings.GetMarkerPrefab().GetComponent<WaypointMarkerUI>();
+                if (prefabMarkerUI == null)
+                {
+                    Debug.LogError($"WaypointUIManager Error: Marker Prefab '{settings.GetMarkerPrefab().name}' is missing the WaypointMarkerUI component! Add the component to your prefab.", this);
+                    error = true;
+                }
+                else if (!prefabMarkerUI.HasValidMarkerIcon())
+                {
+                    Debug.LogError($"WaypointUIManager Error: Marker Prefab '{settings.GetMarkerPrefab().name}' has WaypointMarkerUI but 'Marker Icon' is not assigned! Assign an Image component to the 'Marker Icon' field in the prefab's WaypointMarkerUI component.", this);
+                    error = true;
+                }
+            }
             if (markerParentCanvas == null) { Debug.LogError("WaypointUIManager Error: Marker Parent Canvas not assigned!", this); error = true; }
-            else if (markerParentCanvas.GetComponentInParent<Canvas>() == null) { Debug.LogError("WaypointUIManager Error: Marker Parent Canvas must be a child of a UI Canvas!", this); error = true; } // Ensure it's part of a valid UI hierarchy.
+            else if (markerParentCanvas.GetComponentInParent<Canvas>() == null) { Debug.LogError("WaypointUIManager Error: Marker Parent Canvas must be a child of a UI Canvas!", this); error = true; }
             return error;
         }
 
@@ -290,11 +305,12 @@ namespace WrightAngle.Waypoint
                 createFunc: () => { // Defines how to create a new marker instance when the pool is empty.
                     GameObject go = Instantiate(prefab, markerParentCanvas);
                     WaypointMarkerUI ui = go.GetComponent<WaypointMarkerUI>();
-                    // Add the script if missing on the prefab (for robustness).
+                    // Component is validated in ValidateSetup, but safety check anyway.
                     if (ui == null)
                     {
-                        ui = go.AddComponent<WaypointMarkerUI>();
-                        Debug.LogWarning($"WaypointUIManager: Added missing WaypointMarkerUI script to '{prefab.name}' instance.", go);
+                        Debug.LogError($"WaypointUIManager Error: Failed to get WaypointMarkerUI from instantiated prefab '{prefab.name}'. The prefab must have a WaypointMarkerUI component attached.", go);
+                        Destroy(go);
+                        return null;
                     }
                     go.SetActive(false); // Ensure new instances start inactive.
                     return ui;

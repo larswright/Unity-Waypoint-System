@@ -14,22 +14,38 @@ namespace WrightAngle.Waypoint
     public class WaypointMarkerUI : MonoBehaviour
     {
         [Header("UI Element References")]
-        [Tooltip("The core visual element of your marker (e.g., an arrow, dot, or custom icon). Must have an Image component.")]
+        [Tooltip("The core visual element of your marker (e.g., an arrow, dot, or custom icon). Must have an Image component. If left unassigned, the system will attempt to auto-detect an Image component in children (may pick the wrong one if multiple Images exist).")]
         [SerializeField] private Image markerIcon;
 
         // Cached components for performance
         private RectTransform rectTransform;
 
+        /// <summary>
+        /// Checks if the markerIcon is assigned. Used by WaypointUIManager for prefab validation.
+        /// </summary>
+        /// <returns>True if markerIcon is valid, false otherwise.</returns>
+        public bool HasValidMarkerIcon() => markerIcon != null;
+
         private void Awake()
         {
             rectTransform = GetComponent<RectTransform>();
 
-            // Ensure the essential icon component is assigned
+            // If markerIcon is not assigned, attempt to auto-detect from children
             if (markerIcon == null)
             {
-                Debug.LogError($"<b>[{gameObject.name}] WaypointMarkerUI Error:</b> Marker Icon is not assigned in the Inspector. This is required for the marker to be visible.", this);
-                enabled = false; // Disable if core visual is missing
-                return;
+                markerIcon = GetComponentInChildren<Image>();
+                if (markerIcon != null)
+                {
+                    // Auto-detection succeeded, but warn about potential issues
+                    Debug.LogWarning($"<b>[{gameObject.name}] WaypointMarkerUI:</b> 'Marker Icon' was not assigned. Auto-detected Image component '{markerIcon.name}'. If your prefab has multiple Image components, the wrong one may have been selected. Assign the correct Image in the Inspector to avoid this warning.", this);
+                }
+                else
+                {
+                    // No Image found at all, this is a critical error
+                    Debug.LogError($"<b>[{gameObject.name}] WaypointMarkerUI Error:</b> 'Marker Icon' is not assigned and no Image component was found in children. Add an Image component to your prefab and assign it to the 'Marker Icon' field.", this);
+                    enabled = false;
+                    return;
+                }
             }
 
             // Optimize performance by disabling raycast target for the icon (markers are typically non-interactive)
