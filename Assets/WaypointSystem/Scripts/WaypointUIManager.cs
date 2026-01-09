@@ -193,7 +193,8 @@ namespace WrightAngle.Waypoint
                     // --- Update Marker Visuals ---
                     // Call the marker's UpdateDisplay method to set its position and rotation.
                     // Pass the parent RectTransform and UI camera for proper coordinate conversion.
-                    markerInstance.UpdateDisplay(screenPos, isOnScreen, isBehindCamera, _cachedWaypointCamera, settings, markerParentCanvas, _cachedUICamera);
+                    // Distance is passed for distance-based scaling calculations.
+                    markerInstance.UpdateDisplay(screenPos, isOnScreen, isBehindCamera, _cachedWaypointCamera, settings, markerParentCanvas, _cachedUICamera, distance);
                 }
                 else // Marker should not be shown (e.g., off-screen and indicators disabled).
                 {

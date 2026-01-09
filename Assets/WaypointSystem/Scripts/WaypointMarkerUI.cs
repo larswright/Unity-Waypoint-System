@@ -19,6 +19,8 @@ namespace WrightAngle.Waypoint
 
         // Cached components for performance
         private RectTransform rectTransform;
+        private CanvasGroup canvasGroup; // Used for efficient alpha fading
+        private Vector3 baseScale; // Original scale for reference
 
         /// <summary>
         /// Checks if the markerIcon is assigned. Used by WaypointUIManager for prefab validation.
@@ -29,6 +31,14 @@ namespace WrightAngle.Waypoint
         private void Awake()
         {
             rectTransform = GetComponent<RectTransform>();
+            baseScale = rectTransform.localScale;
+            
+            // Get or add CanvasGroup for efficient alpha control
+            canvasGroup = GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
 
             // If markerIcon is not assigned, attempt to auto-detect from children
             if (markerIcon == null)
@@ -65,7 +75,7 @@ namespace WrightAngle.Waypoint
         /// <param name="settings">The active WaypointSettings asset providing configuration.</param>
         /// <param name="parentRect">The parent RectTransform used for local coordinate conversion and clamping.</param>
         /// <param name="uiCamera">The camera rendering the UI Canvas (null for Screen Space - Overlay).</param>
-        public void UpdateDisplay(Vector3 screenPosition, bool isOnScreen, bool isBehindCamera, Camera cam, WaypointSettings settings, RectTransform parentRect, Camera uiCamera)
+        public void UpdateDisplay(Vector3 screenPosition, bool isOnScreen, bool isBehindCamera, Camera cam, WaypointSettings settings, RectTransform parentRect, Camera uiCamera, float distance)
         {
             // Safety checks for required components and settings
             if (settings == null || rectTransform == null || cam == null || markerIcon == null || parentRect == null)
@@ -88,6 +98,9 @@ namespace WrightAngle.Waypoint
                 }
                 // Ensure no rotation is applied for on-screen markers (local to canvas).
                 rectTransform.localRotation = Quaternion.identity;
+                
+                // Apply distance-based scaling and fading for on-screen markers
+                UpdateScaleAndFade(settings, distance);
                 if (!gameObject.activeSelf) gameObject.SetActive(true); // Ensure marker is visible
             }
             else // --- Target OFF Screen ---
@@ -191,7 +204,61 @@ namespace WrightAngle.Waypoint
                     // Use localRotation to stay upright relative to the Canvas.
                     rectTransform.localRotation = Quaternion.Euler(0, 0, -180f + flipAngle);
                 }
+                // Apply distance-based scaling for off-screen markers if enabled
+                if (settings.ScaleOffScreenMarkers)
+                {
+                    UpdateScaleAndFade(settings, distance);
+                }
+                else
+                {
+                    // Keep full scale and alpha for off-screen visibility
+                    rectTransform.localScale = baseScale;
+                    canvasGroup.alpha = 1f;
+                }
             }
+        }
+        
+        /// <summary>
+        /// Applies distance-based scaling and optional fading to the marker.
+        /// Uses efficient calculations with no allocations.
+        /// </summary>
+        private void UpdateScaleAndFade(WaypointSettings settings, float distance)
+        {
+            if (!settings.UseDistanceScaling)
+            {
+                // Reset to base scale and full alpha when scaling is disabled
+                rectTransform.localScale = baseScale;
+                canvasGroup.alpha = 1f;
+                return;
+            }
+            
+            // Pre-calculate range to avoid repeated division
+            float scaleRange = settings.MaxScaleDistance - settings.MinScaleDistance;
+            
+            // Prevent division by zero
+            if (scaleRange <= 0.001f)
+            {
+                rectTransform.localScale = baseScale;
+                canvasGroup.alpha = 1f;
+                return;
+            }
+            
+            // Calculate normalized distance (0 at MinScaleDistance, 1 at MaxScaleDistance)
+            // Clamp to [0, 1] to handle distances outside the range
+            float normalizedDistance = Mathf.Clamp01((distance - settings.MinScaleDistance) / scaleRange);
+            
+            // Calculate scale: full size when close (low normalizedDistance), smaller when far
+            float scaleFactor = Mathf.Lerp(1f, settings.MinScaleFactor, normalizedDistance);
+            rectTransform.localScale = baseScale * scaleFactor;
+            
+            // Calculate alpha/fade when approaching maximum distance (far away)
+            float alpha = 1f;
+            if (settings.UseFadeAtMinDistance && distance > settings.MaxScaleDistance - settings.FadeRange)
+            {
+                // Fade from 1 at (MaxScaleDistance - FadeRange) to 0 at MaxScaleDistance
+                alpha = Mathf.Clamp01((settings.MaxScaleDistance - distance) / settings.FadeRange);
+            }
+            canvasGroup.alpha = alpha;
         }
 
         /// <summary>

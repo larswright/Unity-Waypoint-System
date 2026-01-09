@@ -20,3 +20,10 @@ MonoBehaviour:
   UseOffScreenIndicators: 1
   ScreenEdgeMargin: 40.2
   FlipOffScreenMarkerY: 1
+  UseDistanceScaling: 1
+  MaxScaleDistance: 50
+  MinScaleDistance: 5
+  MinScaleFactor: 0.3
+  UseFadeAtMinDistance: 1
+  FadeRange: 2
+  ScaleOffScreenMarkers: 1

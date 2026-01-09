@@ -41,6 +41,32 @@ namespace WrightAngle.Waypoint
         [Tooltip("Enable this to flip the off-screen marker's vertical orientation. Useful if your marker icon naturally points downwards.")]
         public bool FlipOffScreenMarkerY = false;
 
+        [Header("Distance-Based Scaling")]
+        [Tooltip("Enable scaling of waypoint markers based on their distance from the camera. Markers appear smaller when close and full size when far.")]
+        public bool UseDistanceScaling = false;
+
+        [Tooltip("Distance at which the marker reaches its maximum scale (1.0). Markers beyond this distance stay at max scale.")]
+        [Min(0.1f)]
+        public float MaxScaleDistance = 50f;
+
+        [Tooltip("Distance at which the marker reaches its minimum scale. Markers closer than this will be hidden (or faded if enabled).")]
+        [Min(0f)]
+        public float MinScaleDistance = 5f;
+
+        [Tooltip("The minimum scale factor applied at MinScaleDistance (0.0 to 1.0). Set to 0 to completely hide markers at minimum distance.")]
+        [Range(0f, 1f)]
+        public float MinScaleFactor = 0.3f;
+
+        [Tooltip("Enable to smoothly fade out markers when approaching MinScaleDistance instead of abruptly hiding.")]
+        public bool UseFadeAtMinDistance = true;
+
+        [Tooltip("Distance range over which the marker fades out when approaching MaxScaleDistance. Fade starts at (MaxScaleDistance - FadeRange) and ends at MaxScaleDistance.")]
+        [Min(0.1f)]
+        public float FadeRange = 2f;
+
+        [Tooltip("Enable to apply distance-based scaling to off-screen indicators as well. When disabled, off-screen markers maintain full size for better visibility.")]
+        public bool ScaleOffScreenMarkers = true;
+
         // --- Helper Methods ---
 
         /// <summary>
