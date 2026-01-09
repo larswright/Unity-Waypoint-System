@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3768ac4941f8e764bacb1a9286a257e1, type: 3}
+  m_Name: DistanceTextSettings
+  m_EditorClassIdentifier: Assembly-CSharp::WrightAngle.Waypoint.DistanceTextSettings
+  UnitSystem: 0
+  MeterSuffix: m
+  KilometerSuffix: km
+  MetersToKilometersThreshold: 1000
+  FeetSuffix: ft
+  YardSuffix: yd
+  MileSuffix: mi
+  FeetToYardsThreshold: 300
+  YardsToMilesThreshold: 1760
+  SkipYards: 0
+  IntegerFormat: N0
+  DecimalFormat: N1
+  DecimalThreshold: 10
+  MinDisplayDistance: 0
+  HideWhenOffScreen: 0
+  TextColor: {r: 1, g: 1, b: 1, a: 1}
+  UseDistanceColors: 0
+  CloseColor: {r: 0, g: 1, b: 0, a: 1}
+  FarColor: {r: 1, g: 0, b: 0, a: 1}
+  CloseDistanceThreshold: 10
+  FarDistanceThreshold: 50

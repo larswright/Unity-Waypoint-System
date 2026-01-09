@@ -17,9 +17,14 @@ namespace WrightAngle.Waypoint
         [Tooltip("The core visual element of your marker (e.g., an arrow, dot, or custom icon). Must have an Image component. If left unassigned, the system will attempt to auto-detect an Image component in children (may pick the wrong one if multiple Images exist).")]
         [SerializeField] private Image markerIcon;
 
+        [Header("Distance Text (Optional)")]
+        [Tooltip("Optional DistanceTextUI component for displaying distance to the target. If assigned, it will be automatically updated during marker display.")]
+        [SerializeField] private DistanceTextUI distanceTextUI;
+
         // Cached components for performance
         private RectTransform rectTransform;
         private CanvasGroup canvasGroup; // Used for efficient alpha fading
+        private bool hasDistanceText; // Cached flag to avoid null checks every frame
         private Vector3 baseScale; // Original scale for reference
 
         /// <summary>
@@ -32,6 +37,9 @@ namespace WrightAngle.Waypoint
         {
             rectTransform = GetComponent<RectTransform>();
             baseScale = rectTransform.localScale;
+            
+            // Cache distance text availability
+            hasDistanceText = distanceTextUI != null;
             
             // Get or add CanvasGroup for efficient alpha control
             canvasGroup = GetComponent<CanvasGroup>();
@@ -101,6 +109,13 @@ namespace WrightAngle.Waypoint
                 
                 // Apply distance-based scaling and fading for on-screen markers
                 UpdateScaleAndFade(settings, distance);
+                
+                // Update distance text if available
+                if (hasDistanceText)
+                {
+                    distanceTextUI.UpdateDistance(distance, true);
+                }
+                
                 if (!gameObject.activeSelf) gameObject.SetActive(true); // Ensure marker is visible
             }
             else // --- Target OFF Screen ---
@@ -214,6 +229,12 @@ namespace WrightAngle.Waypoint
                     // Keep full scale and alpha for off-screen visibility
                     rectTransform.localScale = baseScale;
                     canvasGroup.alpha = 1f;
+                }
+                
+                // Update distance text for off-screen markers if available
+                if (hasDistanceText)
+                {
+                    distanceTextUI.UpdateDistance(distance, false);
                 }
             }
         }
