@@ -67,6 +67,14 @@ namespace WrightAngle.Waypoint
         [Tooltip("Enable to apply distance-based scaling to off-screen indicators as well. When disabled, off-screen markers maintain full size for better visibility.")]
         public bool ScaleOffScreenMarkers = true;
 
+        [Header("Hide When Near")]
+        [Tooltip("Enable to automatically hide waypoint markers when the player is close to the target. Useful for preventing markers from cluttering the screen when already at the destination.")]
+        public bool HideWhenNearTarget = false;
+
+        [Tooltip("Distance (in world units) at which the waypoint marker will be hidden when HideWhenNearTarget is enabled.")]
+        [Min(0.1f)]
+        public float HideNearDistance = 5f;
+
         // --- Helper Methods ---
 
         /// <summary>

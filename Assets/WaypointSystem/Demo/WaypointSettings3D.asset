@@ -27,3 +27,5 @@ MonoBehaviour:
   UseFadeAtMinDistance: 1
   FadeRange: 2
   ScaleOffScreenMarkers: 1
+  HideWhenNearTarget: 0
+  HideNearDistance: 5

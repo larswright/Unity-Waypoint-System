@@ -169,6 +169,13 @@ namespace WrightAngle.Waypoint
                     continue;
                 }
 
+                // Hide marker when within the "near" distance threshold if enabled.
+                if (settings.HideWhenNearTarget && distance <= settings.HideNearDistance)
+                {
+                    TryReleaseMarker(target); // Release marker back to the pool if it was active.
+                    continue;
+                }
+
                 // Project the target's world position to screen space.
                 Vector3 screenPos = _cachedWaypointCamera.WorldToScreenPoint(targetWorldPos);
                 bool isBehindCamera = screenPos.z <= 0; // Check if target is behind the camera's near plane.
