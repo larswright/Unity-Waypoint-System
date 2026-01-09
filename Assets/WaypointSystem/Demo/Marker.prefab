@@ -150,7 +150,6 @@ GameObject:
   - component: {fileID: 2011689613204376976}
   - component: {fileID: -5110513418630572639}
   - component: {fileID: 1458033233190780626}
-  - component: {fileID: 2497332753288945795}
   m_Layer: 5
   m_Name: Marker
   m_TagString: Untagged
@@ -230,7 +229,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   markerIcon: {fileID: 2011689613204376976}
   distanceTextUI: {fileID: 1458033233190780626}
-  waypointNameUI: {fileID: 0}
 --- !u!114 &1458033233190780626
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -246,18 +244,3 @@ MonoBehaviour:
   distanceText: {fileID: 4942747803984853217}
   settings: {fileID: 11400000, guid: 6ae40223d59c7ad47a7d2353f60f96da, type: 2}
   keepUpright: 1
---- !u!114 &2497332753288945795
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6229256527508535590}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d1a6ef73457c90942a37889bc69ddf57, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WrightAngle.Waypoint.WaypointNameUI
-  nameText: {fileID: 0}
-  keepUpright: 1
-  hideWhenOffScreen: 0
