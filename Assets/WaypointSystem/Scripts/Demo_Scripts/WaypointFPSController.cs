@@ -1,4 +1,7 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace WrightAngle.Waypoint
 {
@@ -7,6 +10,7 @@ namespace WrightAngle.Waypoint
     /// Requires a CharacterController component on the same GameObject.
     /// Designed for simple integration, ideal for testing waypoint systems or basic prototypes.
     /// Ensure your main camera is a child of this GameObject.
+    /// Supports both the new Input System and legacy Input Manager automatically.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     [AddComponentMenu("WrightAngle/Waypoint FPS Controller")]
@@ -75,9 +79,26 @@ namespace WrightAngle.Waypoint
         /// </summary>
         private void HandleLook()
         {
-            // Get raw mouse input for immediate responsiveness.
-            float mouseX = Input.GetAxisRaw("Mouse X") * mouseSensitivity;
-            float mouseY = Input.GetAxisRaw("Mouse Y") * mouseSensitivity;
+            float mouseX, mouseY;
+
+#if ENABLE_INPUT_SYSTEM
+            // New Input System: Read mouse delta directly
+            if (Mouse.current != null)
+            {
+                Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+                mouseX = mouseDelta.x * mouseSensitivity * 0.1f; // Scale factor to match legacy sensitivity
+                mouseY = mouseDelta.y * mouseSensitivity * 0.1f;
+            }
+            else
+            {
+                mouseX = 0f;
+                mouseY = 0f;
+            }
+#else
+            // Legacy Input Manager
+            mouseX = Input.GetAxisRaw("Mouse X") * mouseSensitivity;
+            mouseY = Input.GetAxisRaw("Mouse Y") * mouseSensitivity;
+#endif
 
             // Rotate the entire player controller horizontally around the Y-axis.
             transform.Rotate(Vector3.up * mouseX);
@@ -97,9 +118,34 @@ namespace WrightAngle.Waypoint
         /// </summary>
         private void HandleMovement()
         {
-            // Get smoothed movement input axes.
-            float horizontalInput = Input.GetAxis("Horizontal"); // Left/Right
-            float verticalInput = Input.GetAxis("Vertical");     // Forward/Backward
+            float horizontalInput, verticalInput;
+
+#if ENABLE_INPUT_SYSTEM
+            // New Input System: Read keyboard input directly
+            if (Keyboard.current != null)
+            {
+                horizontalInput = 0f;
+                verticalInput = 0f;
+
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed)
+                    horizontalInput -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed)
+                    horizontalInput += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed)
+                    verticalInput -= 1f;
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed)
+                    verticalInput += 1f;
+            }
+            else
+            {
+                horizontalInput = 0f;
+                verticalInput = 0f;
+            }
+#else
+            // Legacy Input Manager
+            horizontalInput = Input.GetAxis("Horizontal");
+            verticalInput = Input.GetAxis("Vertical");
+#endif
 
             // Calculate movement direction relative to the player's current orientation.
             Vector3 moveDirection = (transform.forward * verticalInput + transform.right * horizontalInput).normalized;

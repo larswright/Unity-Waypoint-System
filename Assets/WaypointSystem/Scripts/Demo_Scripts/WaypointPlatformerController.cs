@@ -1,4 +1,7 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace WrightAngle.Waypoint
 {
@@ -7,6 +10,7 @@ namespace WrightAngle.Waypoint
     /// Requires a Rigidbody2D and a Collider2D component on the same GameObject.
     /// Designed for minimal setup, ideal for quick demos or testing basic horizontal movement.
     /// Includes direct camera following (no smoothing).
+    /// Supports both the new Input System and legacy Input Manager automatically.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     [RequireComponent(typeof(Collider2D))] // e.g., BoxCollider2D or CapsuleCollider2D
@@ -79,8 +83,25 @@ namespace WrightAngle.Waypoint
         /// </summary>
         private void HandleInput()
         {
-            // Get raw horizontal input for immediate responsiveness.
+#if ENABLE_INPUT_SYSTEM
+            // New Input System: Read keyboard input directly
+            if (Keyboard.current != null)
+            {
+                horizontalInput = 0f;
+
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed)
+                    horizontalInput -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed)
+                    horizontalInput += 1f;
+            }
+            else
+            {
+                horizontalInput = 0f;
+            }
+#else
+            // Legacy Input Manager
             horizontalInput = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right Arrow
+#endif
         }
 
         /// <summary>
